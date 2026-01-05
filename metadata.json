@@ -1,0 +1,5 @@
+{
+  "name": "AniMangaNet",
+  "description": "A comprehensive Manga discovery platform integrating MangaDex and MyAnimeList (via Jikan) data with Firebase Authentication.",
+  "requestFramePermissions": []
+}
