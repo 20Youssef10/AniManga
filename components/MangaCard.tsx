@@ -1,18 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { EnrichedManga } from '../types';
+import { AniListManga } from '../types';
 import { motion } from 'framer-motion';
 
 interface MangaCardProps {
-  data: EnrichedManga;
+  data: AniListManga;
 }
 
 export const MangaCard: React.FC<MangaCardProps> = ({ data }) => {
-  const { mangadex, anilist, coverUrl } = data;
-  
-  const title = mangadex.attributes.title.en || Object.values(mangadex.attributes.title)[0] || 'Unknown Title';
-  const description = mangadex.attributes.description.en || 'No description available.';
-  const score = anilist?.averageScore;
+  const title = data.title.english || data.title.romaji || data.title.native || 'Unknown Title';
+  const coverUrl = data.coverImage.large || data.coverImage.medium;
+  const score = data.averageScore;
+  const description = data.description || 'No description available.';
+
+  // Strip HTML from description (AniList returns HTML)
+  const plainDesc = description.replace(/<[^>]+>/g, '');
 
   return (
     <motion.div
@@ -24,7 +26,7 @@ export const MangaCard: React.FC<MangaCardProps> = ({ data }) => {
       className="h-full"
     >
       <Link 
-        to={`/manga/${mangadex.id}`}
+        to={`/manga/${data.id}`}
         className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow duration-300 flex flex-col h-full block group"
       >
         <div className="relative aspect-[2/3] w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -59,15 +61,17 @@ export const MangaCard: React.FC<MangaCardProps> = ({ data }) => {
           </h3>
           
           <div className="flex gap-2 mb-3">
-            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-              mangadex.attributes.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-            }`}>
-              {mangadex.attributes.status}
-            </span>
+             {data.status && (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                  data.status === 'FINISHED' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                }`}>
+                  {data.status}
+                </span>
+             )}
           </div>
 
           <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-3 flex-1">
-            {description}
+            {plainDesc}
           </p>
         </div>
       </Link>

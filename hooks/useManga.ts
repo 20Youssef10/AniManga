@@ -1,30 +1,56 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { 
-  searchManga, 
-  fetchMangaByIdWithMal, 
-  fetchMangaDexTags,
-  fetchMangaFeed,
+  searchAniList,
   fetchTrendingManga,
+  fetchSmartMangaDetail,
+  fetchMangaFeed,
+  fetchMangaDexTags,
   fetchRecentChapters
 } from '../services/api';
-import { EnrichedManga, SearchOptions, MangaDexTag, MangaDexChapter } from '../types';
+import { AniListManga, SearchOptions, MangaDexTag, MangaDexChapter } from '../types';
 
 export const useMangaSearch = (options: SearchOptions) => {
-  return useQuery<EnrichedManga[], Error>({
+  return useQuery<AniListManga[], Error>({
     queryKey: ['mangaSearch', options],
-    queryFn: () => searchManga(options),
+    queryFn: () => searchAniList(options),
     staleTime: 1000 * 60 * 5, 
   });
 };
 
+export const usePopularManga = () => {
+  return useQuery<AniListManga[], Error>({
+    queryKey: ['mangaPopular'],
+    queryFn: () => searchAniList({ sort: 'POPULARITY_DESC', page: 1, perPage: 20 }),
+    staleTime: 1000 * 60 * 60,
+  });
+};
+
 export const useTrendingManga = () => {
-  return useQuery<EnrichedManga[], Error>({
+  return useQuery<AniListManga[], Error>({
     queryKey: ['mangaTrending'],
-    queryFn: () => fetchTrendingManga(10),
+    queryFn: fetchTrendingManga,
     staleTime: 1000 * 60 * 60, // 1 hour
   });
 };
 
+export const useMangaDetail = (id: string) => {
+  return useQuery<AniListManga, Error>({
+    queryKey: ['manga', id],
+    queryFn: () => fetchSmartMangaDetail(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+};
+
+export const useMangaFeed = (mangaId?: string) => {
+  return useQuery<MangaDexChapter[], Error>({
+    queryKey: ['mangaFeed', mangaId],
+    queryFn: () => fetchMangaFeed(mangaId!),
+    enabled: !!mangaId,
+  });
+};
+
+// Legacy support for Latest Updates page
 export const useRecentChapters = () => {
   return useInfiniteQuery({
     queryKey: ['recentChapters'],
@@ -33,7 +59,7 @@ export const useRecentChapters = () => {
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === 20 ? allPages.length * 20 : undefined;
     },
-    staleTime: 1000 * 60 * 2, // 2 mins
+    staleTime: 1000 * 60 * 2,
   });
 };
 
@@ -43,25 +69,4 @@ export const useMangaTags = () => {
     queryFn: fetchMangaDexTags,
     staleTime: 1000 * 60 * 60 * 24, 
   });
-};
-
-export const useMangaDetail = (id: string) => {
-  return useQuery<EnrichedManga, Error>({
-    queryKey: ['manga', id],
-    queryFn: () => fetchMangaByIdWithMal(id),
-    enabled: !!id,
-    staleTime: 1000 * 60 * 30, // 30 mins
-  });
-};
-
-export const useMangaFeed = (mangaId: string) => {
-  return useQuery<MangaDexChapter[], Error>({
-    queryKey: ['mangaFeed', mangaId],
-    queryFn: () => fetchMangaFeed(mangaId),
-    enabled: !!mangaId,
-  });
-};
-
-export const usePopularManga = () => {
-  return useMangaSearch({ limit: 12, offset: 0 });
 };

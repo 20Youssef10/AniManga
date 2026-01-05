@@ -1,9 +1,9 @@
 import React from 'react';
 import { MangaCard } from './MangaCard';
-import { EnrichedManga } from '../types';
+import { AniListManga } from '../types';
 
 interface MangaGridProps {
-  data?: EnrichedManga[];
+  data?: AniListManga[];
   isLoading: boolean;
   isError: boolean;
   error?: Error | null;
@@ -62,7 +62,7 @@ export const MangaGrid: React.FC<MangaGridProps> = ({ data, isLoading, isError, 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {data.map((manga) => (
-        <MangaCard key={manga.mangadex.id} data={manga} />
+        <MangaCard key={manga.id} data={manga} />
       ))}
     </div>
   );

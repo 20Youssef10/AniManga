@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useTrendingManga, usePopularManga } from '../hooks/useManga';
+import { useTrendingManga, useMangaSearch } from '../hooks/useManga';
 import { HeroCarousel } from './HeroCarousel';
 import { MangaCard } from './MangaCard';
 import { useLibrary } from '../hooks/useLibrary';
 
 export const HomePage: React.FC = () => {
   const { data: trending, isLoading: trendingLoading } = useTrendingManga();
-  const { data: popular, isLoading: popularLoading } = usePopularManga();
+  // Using default search which is Popularity Desc for "Popular" section
+  const { data: popular, isLoading: popularLoading } = useMangaSearch({ sort: 'POPULARITY_DESC', perPage: 12 });
   const { data: library } = useLibrary();
 
   const recentlyRead = library?.filter(item => item.status === 'reading').slice(0, 4);
@@ -68,7 +69,7 @@ export const HomePage: React.FC = () => {
         ) : (
            <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
               {trending?.map(manga => (
-                 <div key={manga.mangadex.id} className="w-[160px] md:w-[190px] shrink-0 snap-start">
+                 <div key={manga.id} className="w-[160px] md:w-[190px] shrink-0 snap-start">
                     <MangaCard data={manga} />
                  </div>
               ))}
@@ -85,7 +86,7 @@ export const HomePage: React.FC = () => {
             {popularLoading ? (
                 Array.from({length: 12}).map((_, i) => <div key={i} className="bg-gray-200 h-64 rounded-xl animate-pulse" />)
             ) : (
-                popular?.map(manga => <MangaCard key={manga.mangadex.id} data={manga} />)
+                popular?.map(manga => <MangaCard key={manga.id} data={manga} />)
             )}
          </div>
       </div>

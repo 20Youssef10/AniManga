@@ -8,7 +8,7 @@ import { ReadingStatus } from '../types';
 
 export const MangaDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, isError } = useMangaDetail(id!);
+  const { data: manga, isLoading, isError } = useMangaDetail(id!);
   
   // Library Logic
   const { data: libraryEntry } = useLibraryEntry(id!);
@@ -22,17 +22,17 @@ export const MangaDetailPage: React.FC = () => {
   }, [libraryEntry]);
 
   const handleStatusChange = async (newStatus: ReadingStatus) => {
-    if (!data) return;
+    if (!manga) return;
     setStatus(newStatus);
     
-    const title = data.mangadex.attributes.title.en || Object.values(data.mangadex.attributes.title)[0];
+    const title = manga.title.english || manga.title.romaji || manga.title.native;
     
     add.mutate({
-      mangaId: data.mangadex.id,
+      mangaId: manga.id.toString(), // Store as string for consistency
       title: title,
-      coverUrl: data.coverUrl,
+      coverUrl: manga.coverImage.large,
       status: newStatus,
-      malScore: data.anilist?.averageScore // We use AniList score (0-100)
+      malScore: manga.averageScore
     });
   };
 
@@ -46,16 +46,14 @@ export const MangaDetailPage: React.FC = () => {
     );
   }
 
-  if (isError || !data) {
+  if (isError || !manga) {
     return <div className="p-8 text-center text-red-600">Manga not found</div>;
   }
 
-  const { mangadex, anilist, coverUrl } = data;
-  const title = mangadex.attributes.title.en || Object.values(mangadex.attributes.title)[0];
-  const description = mangadex.attributes.description.en || 'No description available.';
-
-  // Banner from AniList, fallback to cover?
-  const bannerImage = anilist?.bannerImage;
+  const title = manga.title.english || manga.title.romaji || manga.title.native;
+  const description = (manga.description || 'No description available.').replace(/<[^>]+>/g, '');
+  const bannerImage = manga.bannerImage || manga.coverImage.extraLarge;
+  const coverUrl = manga.coverImage.extraLarge || manga.coverImage.large;
 
   return (
     <div className="min-h-screen pb-12">
@@ -106,20 +104,20 @@ export const MangaDetailPage: React.FC = () => {
               <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
                  <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
                    <span className="text-sm text-gray-500 dark:text-gray-400">Status</span>
-                   <span className="text-sm font-semibold capitalize text-gray-900 dark:text-gray-200">{mangadex.attributes.status}</span>
+                   <span className="text-sm font-semibold capitalize text-gray-900 dark:text-gray-200">{manga.status}</span>
                  </div>
-                 {anilist?.averageScore && (
+                 {manga.averageScore && (
                    <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
                      <span className="text-sm text-gray-500 dark:text-gray-400">Score</span>
                      <div className="flex items-center gap-1">
-                       <span className="text-brand-600 dark:text-brand-400 font-bold">{anilist.averageScore}%</span>
-                       <span className="text-xs text-gray-400">({anilist.favourites.toLocaleString()} favs)</span>
+                       <span className="text-brand-600 dark:text-brand-400 font-bold">{manga.averageScore}%</span>
+                       <span className="text-xs text-gray-400">({manga.favourites?.toLocaleString()} favs)</span>
                      </div>
                    </div>
                  )}
                  <div className="flex justify-between items-center">
-                   <span className="text-sm text-gray-500 dark:text-gray-400">Rating</span>
-                   <span className="text-sm font-semibold capitalize text-gray-900 dark:text-gray-200">{mangadex.attributes.contentRating}</span>
+                   <span className="text-sm text-gray-500 dark:text-gray-400">Format</span>
+                   <span className="text-sm font-semibold capitalize text-gray-900 dark:text-gray-200">{manga.format}</span>
                  </div>
               </div>
             </div>
@@ -127,8 +125,19 @@ export const MangaDetailPage: React.FC = () => {
             {/* Right Column: Info & Content */}
             <div className="pt-2 md:pt-10">
               <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white mb-2 leading-tight">{title}</h1>
-              {anilist?.title?.native && (
-                <h2 className="text-xl text-gray-500 mb-6">{anilist.title.native}</h2>
+              {manga.title.native && (
+                <h2 className="text-xl text-gray-500 mb-6">{manga.title.native}</h2>
+              )}
+
+              {/* Genres */}
+              {manga.genres && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                      {manga.genres.map(g => (
+                          <span key={g} className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded-full font-medium">
+                              {g}
+                          </span>
+                      ))}
+                  </div>
               )}
 
               <div className="mb-8">
@@ -138,9 +147,22 @@ export const MangaDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <CharacterList characters={anilist?.characters?.nodes} />
+              {manga.characters?.edges && (
+                <CharacterList characters={manga.characters.edges.map(e => ({ role: e.role, ...e.node })) as any} />
+              )}
 
-              <ChapterList mangaId={mangadex.id} />
+              {/* Chapter Feed */}
+              {manga.mangadexId ? (
+                <ChapterList mangaId={manga.mangadexId} />
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl text-yellow-700">
+                    <p className="font-bold">Reader Unavailable</p>
+                    <p className="text-sm mt-1">
+                        We could not automatically find this series on MangaDex. 
+                        It might not be licensed or available for reading yet.
+                    </p>
+                </div>
+              )}
             </div>
           </div>
        </div>
