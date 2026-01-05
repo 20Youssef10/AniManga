@@ -24,7 +24,7 @@ const mangaDexParamsSerializer = (params: Record<string, any>) => {
        // Handle nested objects like 'order[relevance]=desc'
        for (const subKey in value) {
          if (value[subKey]) {
-            searchParams.append(`${key}[${subKey}]`, value[subKey]);
+            searchParams.append(`${key}[${subKey}]`, value[subKey] as string);
          }
        }
     } else {
@@ -235,15 +235,15 @@ export const fetchSmartMangaDetail = async (id: string): Promise<AniListManga> =
     const coverRel = mdManga.relationships.find(r => r.type === 'cover_art');
     // Fix: Handle unknown type from Record<string, unknown> safely
     const attributes = coverRel?.attributes;
-    const fileName = (attributes && typeof attributes.fileName === 'string') 
-      ? attributes.fileName 
+    const fileName = (attributes && typeof attributes['fileName'] === 'string') 
+      ? (attributes['fileName'] as string)
       : undefined;
     
     const coverUrl = fileName ? `https://uploads.mangadex.org/covers/${id}/${fileName}.256.jpg` : '';
     const largeCoverUrl = fileName ? `https://uploads.mangadex.org/covers/${id}/${fileName}` : '';
 
-    const titleEn = mdManga.attributes.title.en;
-    const titleAlt = Object.values(mdManga.attributes.title)[0] || 'Unknown Title';
+    const titleEn = mdManga.attributes.title['en'] as string | undefined;
+    const titleAlt = (Object.values(mdManga.attributes.title)[0] as string | undefined) || 'Unknown Title';
 
     return {
       id: parseInt(id.substring(0, 6), 16), // Fake ID for types
@@ -253,7 +253,7 @@ export const fetchSmartMangaDetail = async (id: string): Promise<AniListManga> =
         romaji: titleAlt,
         native: ''
       },
-      description: mdManga.attributes.description.en || '',
+      description: (mdManga.attributes.description['en'] as string | undefined) || '',
       coverImage: {
         large: largeCoverUrl,
         extraLarge: largeCoverUrl,

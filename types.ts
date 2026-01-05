@@ -34,6 +34,7 @@ export interface MangaDexChapter {
   relationships: Array<{
     id: string;
     type: string;
+    attributes?: Record<string, unknown>;
   }>;
 }
 
