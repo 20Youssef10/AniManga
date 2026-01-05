@@ -12,24 +12,45 @@ const firebaseConfig = {
   measurementId: "G-FBZ07H79ZW"
 };
 
-// Force disable Firebase for this environment to prevent initialization errors
-const ENABLE_FIREBASE = false;
+// Toggle this to force local mode for development/testing
+const ENABLE_FIREBASE = true;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
 
-if (ENABLE_FIREBASE) {
+const initializeFirebase = () => {
+  if (!ENABLE_FIREBASE) {
+    console.log("Firebase disabled by flag. Using local mode.");
+    return;
+  }
+
+  // Basic validation to prevent crashing on empty configs
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
+    console.warn("Invalid Firebase Configuration detected. Falling back to local mode.");
+    return;
+  }
+
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
     googleProvider = new GoogleAuthProvider();
+    console.log("Firebase initialized successfully.");
   } catch (error) {
-    console.warn("Firebase initialization failed:", error);
+    console.error("Firebase initialization failed:", error);
+    console.warn("Falling back to local demo mode. Authentication and Sync will be disabled.");
+    
+    // Ensure all exports are null so consumers know to use fallback
+    app = null;
+    auth = null;
+    db = null;
+    googleProvider = null;
   }
-}
+};
+
+initializeFirebase();
 
 export { app, auth, db, googleProvider };
 export default app;

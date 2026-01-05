@@ -11,10 +11,35 @@ import {
 
 // --- Clients ---
 
+// Custom serializer for MangaDex (requires array[]=value)
+const mangaDexParamsSerializer = (params: Record<string, any>) => {
+  const searchParams = new URLSearchParams();
+  for (const key in params) {
+    const value = params[key];
+    if (value === undefined || value === null) continue;
+
+    if (Array.isArray(value)) {
+      value.forEach(v => searchParams.append(`${key}[]`, v));
+    } else if (typeof value === 'object' && !(value instanceof Date)) {
+       // Handle nested objects like 'order[relevance]=desc'
+       for (const subKey in value) {
+         if (value[subKey]) {
+            searchParams.append(`${key}[${subKey}]`, value[subKey]);
+         }
+       }
+    } else {
+      searchParams.append(key, value.toString());
+    }
+  }
+  return searchParams.toString();
+};
+
 export const mangaDexClient = axios.create({
   baseURL: 'https://api.mangadex.org',
   timeout: 15000,
-  paramsSerializer: { indexes: null }
+  paramsSerializer: {
+    serialize: mangaDexParamsSerializer
+  }
 });
 
 export const aniListClient = axios.create({
@@ -133,6 +158,7 @@ export const fetchAniListDetail = async (id: number): Promise<AniListManga> => {
  * This is the critical "Link" between the two APIs.
  */
 export const findMangaDexId = async (title: string): Promise<string | null> => {
+  if (!title) return null;
   try {
     const response = await mangaDexClient.get<MangaDexResponse<MangaDexManga[]>>('/manga', {
       params: {
@@ -191,7 +217,7 @@ export const fetchSmartMangaDetail = async (id: string): Promise<AniListManga> =
     const aniListManga = await fetchAniListDetail(parseInt(id));
     
     // Try to resolve MangaDex ID for reading
-    const searchTitle = aniListManga.title.english || aniListManga.title.romaji;
+    const searchTitle = aniListManga.title.english || aniListManga.title.romaji || aniListManga.title.native;
     const mdId = await findMangaDexId(searchTitle);
     
     return {
@@ -207,16 +233,24 @@ export const fetchSmartMangaDetail = async (id: string): Promise<AniListManga> =
     
     // Convert MD to AniList Shape for consistent UI
     const coverRel = mdManga.relationships.find(r => r.type === 'cover_art');
-    const fileName = coverRel?.attributes?.fileName as string | undefined;
+    // Fix: Handle unknown type from Record<string, unknown> safely
+    const attributes = coverRel?.attributes;
+    const fileName = (attributes && typeof attributes.fileName === 'string') 
+      ? attributes.fileName 
+      : undefined;
+    
     const coverUrl = fileName ? `https://uploads.mangadex.org/covers/${id}/${fileName}.256.jpg` : '';
     const largeCoverUrl = fileName ? `https://uploads.mangadex.org/covers/${id}/${fileName}` : '';
+
+    const titleEn = mdManga.attributes.title.en;
+    const titleAlt = Object.values(mdManga.attributes.title)[0] || 'Unknown Title';
 
     return {
       id: parseInt(id.substring(0, 6), 16), // Fake ID for types
       mangadexId: id, // The real ID needed for reader
       title: {
-        english: mdManga.attributes.title.en || 'Unknown',
-        romaji: 'Unknown',
+        english: titleEn || titleAlt,
+        romaji: titleAlt,
         native: ''
       },
       description: mdManga.attributes.description.en || '',
@@ -241,7 +275,6 @@ export const fetchMangaDexTags = async (): Promise<MangaDexTag[]> => {
 
 // Keep for Latest Updates Page
 export const fetchRecentChapters = async (limit = 20, offset = 0) => {
-    // ... logic remains similar, effectively fetching from MD
      const response = await mangaDexClient.get<MangaDexResponse<MangaDexChapter[]>>('/chapter', {
     params: {
       limit,

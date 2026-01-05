@@ -3,19 +3,30 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { auth } from '../services/firebase';
 import { fetchLibrary, fetchLibraryEntry, addToLibrary, updateReadingProgress, removeFromLibrary } from '../services/library';
 import { LibraryEntry } from '../types';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 // Hook to check if user is authenticated for queries
 export const useAuthUser = () => {
-  // If auth is null (disabled), we simulate a Demo User
-  const [user, setUser] = useState<any>(auth?.currentUser || (auth === null ? { uid: 'demo-user', isAnonymous: true } : null));
+  // 1. If auth is null (Firebase failed/disabled), use Demo User immediately.
+  // 2. If auth exists but loading, start as null.
+  // 3. If auth exists and cached user exists, use it.
+  const [user, setUser] = useState<User | { uid: string; isAnonymous: boolean } | null>(() => {
+    if (!auth) return { uid: 'demo-user', isAnonymous: true };
+    return auth.currentUser;
+  });
 
   useEffect(() => {
     if (!auth) {
-      // Keep demo user
+      // Double check in case of race conditions, though initial state handles it
+      setUser({ uid: 'demo-user', isAnonymous: true });
       return;
     }
-    return onAuthStateChanged(auth, (u) => setUser(u));
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   return user;
