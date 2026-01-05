@@ -1,5 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
-
 // --- MangaDex Types ---
 
 export interface MangaDexMangaAttributes {
@@ -201,5 +199,5 @@ export interface LibraryEntry {
   currentPage?: number;
   malId?: number; // Used for MAL Sync
   malScore?: number;
-  updatedAt?: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp or ISO string
 }
