@@ -5,7 +5,7 @@ export interface MangaDexMangaAttributes {
   altTitles: Record<string, string>[];
   description: Record<string, string>;
   isLocked: boolean;
-  links: Record<string, string>; // e.g., { mal: "12345", amz: "..." }
+  links: Record<string, string>; // e.g., { mal: "12345", al: "12345", amz: "..." }
   originalLanguage: string;
   lastVolume: string | null;
   lastChapter: string | null;
@@ -107,71 +107,44 @@ export interface AtHomeResponse {
   };
 }
 
-// --- Jikan (MAL) Types ---
+// --- AniList Types ---
 
-export interface JikanManga {
-  mal_id: number;
-  url: string;
-  images: {
-    jpg: {
-      image_url: string;
-      small_image_url: string;
-      large_image_url: string;
-    };
-    webp: {
-      image_url: string;
-      small_image_url: string;
-      large_image_url: string;
-    };
+export interface AniListCharacter {
+  name: {
+    full: string;
   };
-  approved: boolean;
-  titles: Array<{ type: string; title: string }>;
-  title: string;
-  title_english: string | null;
-  title_japanese: string | null;
-  type: string;
-  chapters: number | null;
-  volumes: number | null;
-  status: string;
-  publishing: boolean;
-  score: number | null;
-  scored_by: number | null;
-  rank: number | null;
-  popularity: number | null;
-  members: number | null;
-  favorites: number | null;
-  synopsis: string | null;
-  background: string | null;
-  genres: Array<{ mal_id: number; type: string; name: string; url: string }>;
+  image: {
+    medium: string;
+  };
+  role?: string; // Mapped from edges
 }
 
-export interface JikanCharacter {
-  character: {
-    mal_id: number;
-    url: string;
-    images: {
-      jpg: {
-        image_url: string;
-      };
-      webp: {
-        image_url: string;
-        small_image_url: string;
-      };
-    };
-    name: string;
+export interface AniListManga {
+  id: number;
+  title: {
+    romaji: string;
+    english: string;
+    native: string;
   };
-  role: string;
-}
-
-export interface JikanResponse<T> {
-  data: T;
+  description: string;
+  averageScore: number;
+  favourites: number;
+  coverImage?: {
+    large: string;
+    extraLarge: string;
+  };
+  bannerImage?: string;
+  characters?: {
+    nodes: AniListCharacter[];
+    edges: { role: string }[];
+  };
 }
 
 // --- Combined / App Types ---
 
 export interface EnrichedManga {
   mangadex: MangaDexManga;
-  mal?: JikanManga | null;
+  anilist?: AniListManga | null;
   coverUrl?: string;
 }
 
@@ -197,7 +170,7 @@ export interface LibraryEntry {
   currentChapterId?: string;
   currentChapterNumber?: string;
   currentPage?: number;
-  malId?: number; // Used for MAL Sync
-  malScore?: number;
-  updatedAt?: any; // Firestore Timestamp or ISO string
+  malId?: number; // Kept for legacy compatibility
+  malScore?: number; // Normalized score (0-10 or 0-100 depending on source)
+  updatedAt?: any; 
 }

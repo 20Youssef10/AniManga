@@ -2,31 +2,34 @@ import axios from 'axios';
 import { 
   MangaDexResponse, 
   MangaDexManga, 
-  JikanResponse, 
-  JikanManga, 
   EnrichedManga,
-  MangaDexCover,
   MangaDexTag,
   SearchOptions,
   MangaDexChapter,
   AtHomeResponse,
-  JikanCharacter
+  AniListManga,
+  AniListCharacter
 } from '../types';
 
 // --- Axios Instances ---
 
+// MangaDex requires array params to be serialized as 'key[]=value'
 export const mangaDexClient = axios.create({
   baseURL: 'https://api.mangadex.org',
-  timeout: 10000,
+  timeout: 15000,
+  paramsSerializer: {
+    indexes: null // Result: ids[]=1&ids[]=2
+  }
 });
 
-export const jikanClient = axios.create({
-  baseURL: 'https://api.jikan.moe/v4',
+export const aniListClient = axios.create({
+  baseURL: 'https://graphql.anilist.co',
   timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
 });
-
-// Helper to delay execution (respect Jikan rate limits: 3 req/sec generally)
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- API Functions ---
 
@@ -50,7 +53,7 @@ export const searchManga = async (options: SearchOptions = {}): Promise<Enriched
   const params: Record<string, any> = {
     limit,
     offset,
-    includes: ['cover_art', 'author'], // Added author for better display
+    includes: ['cover_art', 'author'], 
     contentRating: ['safe', 'suggestive'], 
     hasAvailableChapters: 'true',
   };
@@ -68,23 +71,28 @@ export const searchManga = async (options: SearchOptions = {}): Promise<Enriched
   }
 
   const mdResponse = await mangaDexClient.get<MangaDexResponse<MangaDexManga[]>>('/manga', { params });
-  return enrichMangaList(mdResponse.data.data);
+  // We do NOT enrich lists with external data to prevent N+1 and rate limits.
+  return mapMangaList(mdResponse.data.data);
 };
 
-// Trending / Seasonal
+// Trending
 export const fetchTrendingManga = async (limit = 10): Promise<EnrichedManga[]> => {
-  // MangaDex doesn't have a direct "trending" endpoint, but we can approximate with followedCount + createdAt recency
-  // or use their /manga?order[followedCount]=desc&createdAtSince=...
-  // For simplicity, we use popular new titles
   const params = {
     limit,
     includes: ['cover_art'],
     order: { followedCount: 'desc' },
     contentRating: ['safe', 'suggestive'],
     hasAvailableChapters: 'true',
+    createdAtSince: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Last 30 days
   };
+  
   const response = await mangaDexClient.get<MangaDexResponse<MangaDexManga[]>>('/manga', { params });
-  return enrichMangaList(response.data.data);
+  
+  // For trending (Hero Carousel), we CAN enrich a few items to show nice stats
+  const enriched = await enrichMangaList(response.data.data.slice(0, 5));
+  const rest = mapMangaList(response.data.data.slice(5));
+  
+  return [...enriched, ...rest];
 };
 
 export const fetchRecentChapters = async (limit = 20, offset = 0): Promise<{ chapter: MangaDexChapter, manga: MangaDexManga }[]> => {
@@ -99,20 +107,16 @@ export const fetchRecentChapters = async (limit = 20, offset = 0): Promise<{ cha
     }
   });
 
-  const chapters = response.data.data;
-  
-  // The 'manga' relationship in chapter response is minimal. 
-  // We might want to fetch full manga details or just rely on the relationship data if it has attributes (it usually doesn't in list view).
-  // However, `includes: ['manga']` populates the relationship array but NOT attributes in the /chapter endpoint usually.
-  // Actually, for /chapter, includes=['manga'] DOES populate relationships.
-  
-  return chapters.map(ch => {
+  return response.data.data.map(ch => {
+    // The manga relationship typically comes with minimal attributes in list view
+    // We try to extract what we can
     const mangaRel = ch.relationships.find(r => r.type === 'manga');
-    // We create a partial manga object
+    
+    // Create a mock manga object from the relationship data
     const mangaObj = {
       id: mangaRel?.id || '',
       type: 'manga',
-      attributes: mangaRel?.attributes || {}, // Note: Attributes might be missing depending on API version/flags
+      attributes: mangaRel?.attributes || { title: { en: 'Unknown Series' } },
       relationships: [] 
     } as unknown as MangaDexManga;
 
@@ -123,43 +127,49 @@ export const fetchRecentChapters = async (limit = 20, offset = 0): Promise<{ cha
   });
 };
 
-// Enrichment Helper
-const enrichMangaList = async (mangaList: MangaDexManga[]): Promise<EnrichedManga[]> => {
-  const enrichedPromises = mangaList.map(async (manga, index) => {
-    let malData: JikanManga | null = null;
-    const malIdStr = manga.attributes.links?.mal;
-
-    const coverRel = manga.relationships.find(r => r.type === 'cover_art');
-    let coverUrl: string | undefined;
-    if (coverRel && coverRel.attributes) {
-        const coverAttributes = coverRel.attributes as unknown as { fileName: string };
-        if (coverAttributes?.fileName) {
-             coverUrl = getCoverUrl(manga.id, coverAttributes.fileName);
+// --- Helper: Basic Mapping (No External Calls) ---
+const mapMangaList = (mangaList: MangaDexManga[]): EnrichedManga[] => {
+    return mangaList.map(manga => {
+        const coverRel = manga.relationships.find(r => r.type === 'cover_art');
+        let coverUrl: string | undefined;
+        if (coverRel && coverRel.attributes) {
+            const coverAttributes = coverRel.attributes as unknown as { fileName: string };
+            if (coverAttributes?.fileName) {
+                coverUrl = getCoverUrl(manga.id, coverAttributes.fileName);
+            }
         }
-    }
+        return {
+            mangadex: manga,
+            coverUrl,
+            anilist: null
+        };
+    });
+};
 
-    // Rate limit optimization: Only fetch MAL for top 3 items or specific views to save quota
-    // Or skip MAL enrichment for lists to speed up UI
-    if (malIdStr && index < 3) { 
-      try {
-        // Very conservative delay
-        await delay(index * 250); 
-        const malResponse = await jikanClient.get<JikanResponse<JikanManga>>(`/manga/${malIdStr}`);
-        malData = malResponse.data.data;
-      } catch (error) {
-        // Silently ignore
+// --- Helper: Full Enrichment (With AniList) ---
+const enrichMangaList = async (mangaList: MangaDexManga[]): Promise<EnrichedManga[]> => {
+  return Promise.all(mangaList.map(async (manga) => {
+      const basic = mapMangaList([manga])[0];
+      const alIdStr = manga.attributes.links?.al;
+      
+      let anilistData: AniListManga | null = null;
+
+      if (alIdStr) {
+          try {
+              anilistData = await fetchAniListMangaData(parseInt(alIdStr));
+          } catch (e) {
+              console.warn(`Failed to fetch AniList for ${manga.id}`);
+          }
       }
-    }
 
-    return {
-      mangadex: manga,
-      mal: malData,
-      coverUrl,
-    };
-  });
-
-  return Promise.all(enrichedPromises);
+      return {
+          ...basic,
+          anilist: anilistData
+      };
+  }));
 }
+
+// --- Detail Fetching ---
 
 export const fetchMangaByIdWithMal = async (id: string): Promise<EnrichedManga> => {
   const mdResponse = await mangaDexClient.get<MangaDexResponse<MangaDexManga>>(`/manga/${id}`, {
@@ -167,31 +177,23 @@ export const fetchMangaByIdWithMal = async (id: string): Promise<EnrichedManga> 
   });
   
   const manga = mdResponse.data.data;
-  const malIdStr = manga.attributes.links?.mal;
-  let malData: JikanManga | null = null;
+  const basic = mapMangaList([manga])[0];
+  
+  // Prefer AniList (al), fallback to MAL (mal) -> AniList search? No, keep simple.
+  const alIdStr = manga.attributes.links?.al;
+  let anilistData: AniListManga | null = null;
 
-   const coverRel = manga.relationships.find(r => r.type === 'cover_art');
-   let coverUrl: string | undefined;
-   if (coverRel && coverRel.attributes) {
-       const coverAttributes = coverRel.attributes as unknown as { fileName: string };
-       if (coverAttributes?.fileName) {
-            coverUrl = getCoverUrl(manga.id, coverAttributes.fileName);
-       }
-   }
-
-  if (malIdStr) {
+  if (alIdStr) {
     try {
-      const malResponse = await jikanClient.get<JikanResponse<JikanManga>>(`/manga/${malIdStr}`);
-      malData = malResponse.data.data;
+        anilistData = await fetchAniListMangaData(parseInt(alIdStr));
     } catch (e) {
-      console.warn("MAL fetch failed", e);
+        console.error("AniList Fetch Error", e);
     }
   }
 
   return {
-    mangadex: manga,
-    mal: malData,
-    coverUrl
+    ...basic,
+    anilist: anilistData
   };
 };
 
@@ -209,12 +211,58 @@ export const fetchMangaFeed = async (mangaId: string, limit = 100, offset = 0): 
   return response.data.data;
 };
 
-export const fetchMangaCharacters = async (malId: number): Promise<JikanCharacter[]> => {
-  const response = await jikanClient.get<JikanResponse<JikanCharacter[]>>(`/manga/${malId}/characters`);
-  return response.data.data.slice(0, 15);
-};
-
 export const fetchChapterPages = async (chapterId: string): Promise<AtHomeResponse> => {
   const response = await mangaDexClient.get<AtHomeResponse>(`/at-home/server/${chapterId}`);
   return response.data;
 };
+
+// --- AniList GraphQL ---
+
+const fetchAniListMangaData = async (id: number): Promise<AniListManga> => {
+    const query = `
+    query ($id: Int) {
+      Media (id: $id, type: MANGA) {
+        id
+        title {
+          romaji
+          english
+          native
+        }
+        description
+        averageScore
+        favourites
+        bannerImage
+        characters (sort: ROLE, perPage: 10) {
+          edges {
+             role
+             node {
+               name { full }
+               image { medium }
+             }
+          }
+        }
+      }
+    }
+    `;
+    
+    const response = await aniListClient.post('', {
+        query,
+        variables: { id }
+    });
+
+    const media = response.data.data.Media;
+    
+    // Map characters to flat structure
+    const characters = {
+        nodes: media.characters.edges.map((edge: any) => ({
+            ...edge.node,
+            role: edge.role
+        })),
+        edges: []
+    };
+
+    return {
+        ...media,
+        characters
+    };
+}

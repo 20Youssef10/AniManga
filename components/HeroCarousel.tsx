@@ -22,7 +22,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
   const current = data[currentIndex];
-  const { mangadex, mal } = current;
+  const { mangadex, anilist } = current;
   const title = mangadex.attributes.title.en || Object.values(mangadex.attributes.title)[0];
   const description = mangadex.attributes.description.en || 'No description available.';
   
@@ -31,7 +31,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ data }) => {
   const heroImage = coverFileName ? getOriginalCoverUrl(mangadex.id, coverFileName) : current.coverUrl;
 
   return (
-    <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-2xl shadow-2xl mb-10 group">
+    <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-2xl shadow-2xl mb-10 group bg-gray-900">
       {/* Background Image with Blur */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -72,12 +72,12 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ data }) => {
               <h2 className="text-3xl md:text-5xl font-extrabold text-white leading-tight line-clamp-2 drop-shadow-md">
                 {title}
               </h2>
-              {mal?.score && (
+              {anilist?.averageScore && (
                   <div className="flex items-center gap-2 mt-2">
-                     <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">
-                        ★ {mal.score}
+                     <span className="bg-brand-600 text-white text-xs font-bold px-2 py-1 rounded">
+                        {anilist.averageScore}% Score
                      </span>
-                     <span className="text-gray-300 text-sm">{mal.scored_by?.toLocaleString()} ratings</span>
+                     <span className="text-gray-300 text-sm">{anilist.favourites?.toLocaleString()} favourites</span>
                   </div>
               )}
               <p className="text-gray-200 mt-4 line-clamp-2 md:line-clamp-3 text-sm md:text-base max-w-xl">

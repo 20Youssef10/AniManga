@@ -7,7 +7,7 @@ import { useMangaSearch } from '../hooks/useManga';
 export const SearchPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [minRating, setMinRating] = useState(0);
+  // We removed the minRating filter from the UI because list views are no longer auto-enriched with scores for performance.
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const { data, isLoading, isError, error } = useMangaSearch({
@@ -15,15 +15,6 @@ export const SearchPage: React.FC = () => {
     includedTags: selectedTags,
     limit: 24
   });
-
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-    if (minRating === 0) return data;
-    return data.filter(item => {
-      if (!item.mal || !item.mal.score) return false;
-      return item.mal.score >= minRating;
-    });
-  }, [data, minRating]);
 
   const handleTagToggle = (tagId: string) => {
     setSelectedTags(prev => 
@@ -77,12 +68,12 @@ export const SearchPage: React.FC = () => {
              <AdvancedFilter 
                selectedTags={selectedTags} 
                onTagToggle={handleTagToggle}
-               minRating={minRating}
-               onRatingChange={setMinRating}
+               minRating={0}
+               onRatingChange={() => {}}
              />
-             {(selectedTags.length > 0 || minRating > 0) && (
+             {selectedTags.length > 0 && (
                <button 
-                 onClick={() => { setSelectedTags([]); setMinRating(0); }}
+                 onClick={() => setSelectedTags([])}
                  className="mt-6 w-full text-sm text-red-600 font-medium hover:text-red-800 py-2"
                >
                  Clear all filters
@@ -95,12 +86,12 @@ export const SearchPage: React.FC = () => {
         <div className="flex-1">
           <div className="mb-4 flex items-center justify-between">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {isLoading ? 'Searching...' : `Showing ${filteredData.length} results`}
+              {isLoading ? 'Searching...' : `Showing ${data?.length || 0} results`}
             </span>
           </div>
           
           <MangaGrid 
-            data={filteredData} 
+            data={data} 
             isLoading={isLoading} 
             isError={isError} 
             error={error} 

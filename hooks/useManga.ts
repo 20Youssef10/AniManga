@@ -4,11 +4,10 @@ import {
   fetchMangaByIdWithMal, 
   fetchMangaDexTags,
   fetchMangaFeed,
-  fetchMangaCharacters,
   fetchTrendingManga,
   fetchRecentChapters
 } from '../services/api';
-import { EnrichedManga, SearchOptions, MangaDexTag, MangaDexChapter, JikanCharacter, MangaDexManga } from '../types';
+import { EnrichedManga, SearchOptions, MangaDexTag, MangaDexChapter } from '../types';
 
 export const useMangaSearch = (options: SearchOptions) => {
   return useQuery<EnrichedManga[], Error>({
@@ -60,15 +59,6 @@ export const useMangaFeed = (mangaId: string) => {
     queryKey: ['mangaFeed', mangaId],
     queryFn: () => fetchMangaFeed(mangaId),
     enabled: !!mangaId,
-  });
-};
-
-export const useMangaCharacters = (malId?: number) => {
-  return useQuery<JikanCharacter[], Error>({
-    queryKey: ['mangaCharacters', malId],
-    queryFn: () => fetchMangaCharacters(malId!),
-    enabled: !!malId,
-    retry: false, 
   });
 };
 

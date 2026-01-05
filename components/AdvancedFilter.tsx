@@ -10,9 +10,7 @@ interface AdvancedFilterProps {
 
 export const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
   selectedTags,
-  onTagToggle,
-  minRating,
-  onRatingChange
+  onTagToggle
 }) => {
   const { data: tags, isLoading } = useMangaTags();
 
@@ -43,32 +41,6 @@ export const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
 
   return (
     <div className="space-y-8 p-1">
-      {/* Rating Filter */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
-          Minimum MAL Score
-        </h3>
-        <div className="px-2">
-          <div className="flex justify-between text-xs text-gray-500 mb-2">
-            <span>Any</span>
-            <span className="font-bold text-brand-600">{minRating > 0 ? minRating : 'All'}</span>
-            <span>10</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="10"
-            step="0.5"
-            value={minRating}
-            onChange={(e) => onRatingChange(parseFloat(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-          />
-          <p className="text-xs text-gray-500 mt-2">
-            Filter currently loaded results by their MyAnimeList score.
-          </p>
-        </div>
-      </div>
-
       {/* Tag Filters */}
       {displayGroups.map(groupName => {
         const groupTags = groupedTags[groupName];
@@ -76,7 +48,7 @@ export const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
 
         return (
           <div key={groupName}>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-300 uppercase tracking-wider mb-3">
               {groupName}s
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -88,8 +60,8 @@ export const AdvancedFilter: React.FC<AdvancedFilterProps> = ({
                     onClick={() => onTagToggle(tag.id)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
                       isSelected
-                        ? 'bg-brand-100 text-brand-800 border-brand-200'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        ? 'bg-brand-100 text-brand-800 border-brand-200 dark:bg-brand-900 dark:text-brand-200 dark:border-brand-700'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
                     }`}
                   >
                     {tag.attributes.name.en}
